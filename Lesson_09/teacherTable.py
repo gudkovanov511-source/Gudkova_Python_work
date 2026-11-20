@@ -4,8 +4,8 @@ from sqlalchemy import create_engine, text
 class TeacherTable:
     __scripts = {
         "insert_new": text(
-            "INSERT INTO teacher (\"email\", \"group_id\") "
-            "VALUES (:new_email, :new_group_id) "
+            "INSERT INTO teacher (\"teacher_id\", \"email\", \"group_id\") "
+            "VALUES (:new_teacher_id, :new_email, :new_group_id) "
             "RETURNING teacher_id, email, group_id"
         ),
         "search_by_email": text(
@@ -21,17 +21,31 @@ class TeacherTable:
             "UPDATE teacher SET email = :new_email, group_id = :new_group_id "
             "WHERE teacher_id = :t_id "
             "RETURNING teacher_id, email, group_id"
+        ),
+        "get_next_teacher_id": text(
+            "SELECT COALESCE(MAX(teacher_id), 0) + 1 FROM teacher"
         )
     }
 
     def __init__(self, connection_string):
         self.__db = create_engine(connection_string)
 
-    def create_teacher(self, email, group_id):
+    def get_next_teacher_id(self):
+        conn = self.__db.connect()
+        result = conn.execute(self.__scripts["get_next_teacher_id"])
+        next_teacher_id = result.scalar()
+        conn.close()
+        return next_teacher_id
+
+    def create_teacher(self, teacher_id, email, group_id):
         conn = self.__db.connect()
         result = conn.execute(
             self.__scripts["insert_new"],
-            {"new_email": email, "new_group_id": group_id}
+            {
+                "new_teacher_id": teacher_id,
+                "new_email": email,
+                "new_group_id": group_id
+             }
             )
         conn.commit()
         new_teacher = result.mappings().first()
